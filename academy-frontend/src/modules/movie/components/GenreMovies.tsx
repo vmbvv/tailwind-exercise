@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useGetMoviesTans } from "../hooks/useGetMoviesTans";
 import { MoviesSection } from "./MoviesSection";
 
@@ -28,13 +28,10 @@ export const GenreMovies = () => {
     pageSize,
   );
 
-  useEffect(() => {
-    setPage(1);
-  }, [trimmedGenre]);
-
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setActiveGenre(genreInput.trim());
+    setPage(1);
   };
 
   const hint = useMemo(() => {
@@ -73,6 +70,7 @@ export const GenreMovies = () => {
               onClick={() => {
                 setGenreInput(genre);
                 setActiveGenre(genre);
+                setPage(1);
               }}
               className="rounded-full border border-white/10 bg-slate-900/60 px-3 py-1 uppercase tracking-wide transition hover:border-teal-200/50 hover:text-teal-200"
             >

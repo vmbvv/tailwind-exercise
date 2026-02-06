@@ -5,10 +5,18 @@ export interface AddMoviePayload {
   year?: number;
   runtime?: number;
   genres?: string[];
+  cast?: string[];
+  directors?: string[];
+  languages?: string[];
   poster?: string;
   plot?: string;
   fullplot?: string;
   imdbRating?: number;
+  imdbVotes?: number;
+  imdbId?: number;
+  awardsText?: string;
+  awardsWins?: number;
+  awardsNominations?: number;
   released?: string;
 }
 
@@ -33,6 +41,7 @@ export const useAddMovie = () => {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["movies"] });
+      await queryClient.invalidateQueries({ queryKey: ["movie-genres"] });
     }
   });
 
