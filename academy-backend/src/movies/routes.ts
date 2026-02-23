@@ -15,14 +15,14 @@ const parseMovieObjectId = (movieId?: string) => {
 
 const parseStringList = (value?: string[] | string) => {
   if (Array.isArray(value)) {
-    const normalized = value.map(item => item.trim()).filter(Boolean);
+    const normalized = value.map((item) => item.trim()).filter(Boolean);
     return normalized.length ? normalized : undefined;
   }
 
   if (typeof value === "string") {
     const normalized = value
       .split(",")
-      .map(item => item.trim())
+      .map((item) => item.trim())
       .filter(Boolean);
     return normalized.length ? normalized : undefined;
   }
@@ -34,7 +34,10 @@ movieRouter.get("/movies/genres", async (_req: Request, res: Response) => {
   try {
     const genres = await Movies.distinct("genres");
     const normalizedGenres = genres
-      .filter((genre): genre is string => typeof genre === "string" && Boolean(genre.trim()))
+      .filter(
+        (genre): genre is string =>
+          typeof genre === "string" && Boolean(genre.trim()),
+      )
       .sort((a, b) => a.localeCompare(b));
 
     res.json({ items: normalizedGenres });
@@ -45,7 +48,7 @@ movieRouter.get("/movies/genres", async (_req: Request, res: Response) => {
 });
 
 movieRouter.get("/movies", async (req: Request, res: Response) => {
-  const { genre, page, limit } = req.query;
+  const { genre, page, limit, sortBy = "title", order = "asc" } = req.query;
 
   const query = {} as any;
 
@@ -56,12 +59,19 @@ movieRouter.get("/movies", async (req: Request, res: Response) => {
   const pageNumber = Math.max(Number(page) || 1, 1);
   const pageSize = Math.min(Math.max(Number(limit) || 25, 1), 50);
 
+  let sortOrder: number;
+  if (order === "desc") {
+    sortOrder = -1; // буурах дараалал
+  } else {
+    sortOrder = 1; // өсөх дараалал
+  }
+
   const [movies, total] = await Promise.all([
     Movies.find(query)
-      .sort({ _id: -1 })
+      .sort({ [sortBy as string]: sortOrder as 1 | -1 })
       .skip((pageNumber - 1) * pageSize)
       .limit(pageSize),
-    Movies.countDocuments(query)
+    Movies.countDocuments(query),
   ]);
 
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
@@ -71,7 +81,7 @@ movieRouter.get("/movies", async (req: Request, res: Response) => {
     total,
     page: pageNumber,
     pageSize,
-    totalPages
+    totalPages,
   });
 });
 
@@ -115,7 +125,7 @@ movieRouter.post("/addMovie", async (req: Request, res: Response) => {
       released,
       awardsText,
       awardsWins,
-      awardsNominations
+      awardsNominations,
     } = req.body as {
       title?: string;
       year?: number | string;
@@ -147,17 +157,20 @@ movieRouter.post("/addMovie", async (req: Request, res: Response) => {
 
     const parsedYear = year !== undefined ? Number(year) : Number.NaN;
     const parsedRuntime = runtime !== undefined ? Number(runtime) : Number.NaN;
-    const parsedRating = imdbRating !== undefined ? Number(imdbRating) : Number.NaN;
-    const parsedVotes = imdbVotes !== undefined ? Number(imdbVotes) : Number.NaN;
+    const parsedRating =
+      imdbRating !== undefined ? Number(imdbRating) : Number.NaN;
+    const parsedVotes =
+      imdbVotes !== undefined ? Number(imdbVotes) : Number.NaN;
     const parsedImdbId = imdbId !== undefined ? Number(imdbId) : Number.NaN;
-    const parsedAwardsWins = awardsWins !== undefined ? Number(awardsWins) : Number.NaN;
+    const parsedAwardsWins =
+      awardsWins !== undefined ? Number(awardsWins) : Number.NaN;
     const parsedAwardsNominations =
       awardsNominations !== undefined ? Number(awardsNominations) : Number.NaN;
     const parsedReleased = released ? new Date(released) : null;
     const normalizedAwardsText = awardsText?.trim();
 
     const movieData: Partial<IMoviesDocument> = {
-      title: title.trim()
+      title: title.trim(),
     };
 
     if (Number.isFinite(parsedYear)) {
@@ -283,12 +296,30 @@ movieRouter.post("/:movieId/comments", async (req: Request, res: Response) => {
     const comment = await MovieComments.create({
       movieId: movieObjectId,
       author: normalizedAuthor.slice(0, 40),
-      message: normalizedMessage.slice(0, 600)
+      message: normalizedMessage.slice(0, 600),
     });
 
     res.status(201).json(comment);
   } catch (error) {
     console.error("Add comment error:", error);
     res.status(500).json({ error: "Failed to post comment." });
+  }
+});
+
+movieRouter.get("/movies/search", async (req: Request, res: Response) => {
+  try {
+    const { query } = req.query as {
+      query?: string;
+    };
+
+    const search = await Movies.find({
+      field: {
+        $regex: query,
+        $options: "im",
+      },
+    });
+  } catch (error) {
+    console.error("search error:", error);
+    res.status(400).json({ error: "Failed to search" });
   }
 });
