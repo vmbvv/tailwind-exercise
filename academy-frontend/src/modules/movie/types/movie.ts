@@ -1,3 +1,9 @@
+export interface IMovieRating {
+  userId: string;
+  value: number;
+  createdAt: string;
+}
+
 export interface IMovie {
   _id?: string;
   title: string;
@@ -21,13 +27,22 @@ export interface IMovie {
     votes?: number;
     id?: number;
   };
+  ratings?: IMovieRating[];
+  likes?: string[];
+  averageUserRating?: number;
+  totalUserRatings?: number;
+  likeCount?: number;
 }
 
 export interface IMovieComment {
   _id: string;
   movieId: string;
-  author: string;
-  message: string;
+  user: {
+    id: string;
+    name: string;
+    email?: string;
+  };
+  text: string;
   createdAt: string;
   updatedAt: string;
 }

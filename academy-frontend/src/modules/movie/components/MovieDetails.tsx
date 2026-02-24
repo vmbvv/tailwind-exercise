@@ -1,125 +1,160 @@
-﻿import { useMemo, useRef, useState, type FormEvent } from "react";
-import {
-  ArrowLeft,
-  Calendar,
-  Clock3,
-  Film,
-  MessageCircle,
-  Send,
-  Star,
-  UserCircle2
-} from "lucide-react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
+import { ArrowLeft, Film, Heart, MessageCircle, Star } from "lucide-react";
+import { useAuth } from "@/AuthContext";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { useGetMovieDetails } from "../hooks/useGetMovieDetails";
 import { useAddMovieComment, useMovieComments } from "../hooks/useMovieComments";
+import { useLikeMovie, useRateMovie } from "../hooks/useMovieInteractions";
 
 interface MovieDetailsProps {
   movieId: string;
   onBack: () => void;
 }
 
-const formatAbsoluteDate = (value?: string) => {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric"
-  }).format(date);
-};
-
 const formatRelativeTime = (value: string) => {
   const timestamp = new Date(value).getTime();
+
   if (Number.isNaN(timestamp)) {
     return "just now";
   }
 
   const delta = Date.now() - timestamp;
+
   if (delta < 60_000) {
     return "just now";
   }
 
   const minutes = Math.floor(delta / 60_000);
+
   if (minutes < 60) {
     return `${minutes} min ago`;
   }
 
   const hours = Math.floor(minutes / 60);
+
   if (hours < 24) {
     return `${hours} hr ago`;
   }
 
   const days = Math.floor(hours / 24);
+
   if (days < 30) {
     return `${days} day${days > 1 ? "s" : ""} ago`;
   }
 
   const months = Math.floor(days / 30);
+
   if (months < 12) {
     return `${months} month${months > 1 ? "s" : ""} ago`;
   }
 
   const years = Math.floor(months / 12);
+
   return `${years} year${years > 1 ? "s" : ""} ago`;
 };
 
 export const MovieDetails = ({ movieId, onBack }: MovieDetailsProps) => {
   const { movie, loading, isError } = useGetMovieDetails(movieId);
-  const { comments, loading: commentsLoading, isError: commentsError } = useMovieComments(movieId);
-  const { addComment, isPending, isError: isCommentError, error } = useAddMovieComment(movieId);
+  const {
+    comments,
+    loading: commentsLoading,
+    isError: commentsError,
+  } = useMovieComments(movieId);
+  const {
+    addComment,
+    isPending: commentPending,
+    isError: isCommentError,
+    error: commentError,
+  } = useAddMovieComment(movieId);
 
-  const [author, setAuthor] = useState("");
+  const { toggleLike, isPending: likePending, error: likeError } = useLikeMovie(movieId);
+  const { rateMovie, isPending: ratePending, error: rateError } = useRateMovie(movieId);
+
+  const { user, isAuthenticated } = useAuth();
+
   const [message, setMessage] = useState("");
-  const [isMessageTouched, setIsMessageTouched] = useState(false);
   const [hasImageError, setHasImageError] = useState(false);
   const commentsSectionRef = useRef<HTMLElement | null>(null);
 
-  const fullReleaseDate = useMemo(() => formatAbsoluteDate(movie?.released), [movie?.released]);
   const posterUrl = movie?.poster?.startsWith("http") ? movie.poster : "";
   const hasPoster = Boolean(posterUrl) && !hasImageError;
   const plot = movie?.fullplot ?? movie?.plot ?? "No plot is available yet.";
-  const commentErrorMessage =
-    error instanceof Error ? error.message : "Failed to post your comment.";
+
+  const likeCount = movie?.likeCount ?? movie?.likes?.length ?? 0;
+
+  const hasLiked = useMemo(() => {
+    if (!user || !movie?.likes?.length) {
+      return false;
+    }
+
+    return movie.likes.some((id) => String(id) === user.id);
+  }, [movie?.likes, user]);
+
+  const myRating = useMemo(() => {
+    if (!user || !movie?.ratings?.length) {
+      return 0;
+    }
+
+    const existing = movie.ratings.find((item) => String(item.userId) === user.id);
+    return existing?.value ?? 0;
+  }, [movie?.ratings, user]);
+
+  const averageRating = useMemo(() => {
+    if (typeof movie?.averageUserRating === "number") {
+      return movie.averageUserRating;
+    }
+
+    if (!movie?.ratings?.length) {
+      return 0;
+    }
+
+    return Number(
+      (
+        movie.ratings.reduce((sum, item) => sum + Number(item.value), 0) /
+        movie.ratings.length
+      ).toFixed(1),
+    );
+  }, [movie]);
+
+  const totalRatings = movie?.totalUserRatings ?? movie?.ratings?.length ?? 0;
 
   const handleSubmitComment = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setIsMessageTouched(true);
 
     const trimmedMessage = message.trim();
+
     if (!trimmedMessage) {
       return;
     }
 
     addComment(
-      {
-        author: author.trim() || "Anonymous",
-        message: trimmedMessage
-      },
+      { text: trimmedMessage },
       {
         onSuccess: () => {
           setMessage("");
-          setIsMessageTouched(false);
-        }
-      }
+        },
+      },
     );
+  };
+
+  const handleRate = (value: number) => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    rateMovie({ value });
   };
 
   return (
     <section className="mt-10 animate-fade-up">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-amber-300/70 hover:text-amber-300"
-      >
+      <Button type="button" variant="outline" onClick={onBack} className="inline-flex items-center gap-2">
         <ArrowLeft size={16} />
         Back to all movies
-      </button>
+      </Button>
 
       {loading ? (
         <div className="mt-6 h-80 animate-pulse rounded-3xl border border-slate-800 bg-slate-900/60" />
@@ -147,161 +182,125 @@ export const MovieDetails = ({ movieId, onBack }: MovieDetailsProps) => {
               </div>
             </div>
 
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div>
                 <h1 className="text-3xl font-semibold text-white md:text-5xl">{movie.title}</h1>
-                <div className="mt-4 flex flex-wrap items-center gap-4 text-base text-slate-300 md:text-xl">
-                  {movie.imdb?.rating ? (
-                    <span className="inline-flex items-center gap-2 text-amber-300">
-                      <Star size={19} className="fill-current" />
-                      {movie.imdb.rating.toFixed(1)}/10
-                      {movie.imdb.votes ? (
-                        <span className="text-slate-400">({movie.imdb.votes.toLocaleString()} votes)</span>
-                      ) : null}
-                    </span>
-                  ) : null}
-
-                  {movie.year ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Calendar size={18} />
-                      {movie.year}
-                    </span>
-                  ) : null}
-
-                  {movie.runtime ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Clock3 size={18} />
-                      {movie.runtime} min
-                    </span>
-                  ) : null}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {movie.imdb?.rating ? <Badge>IMDb {movie.imdb.rating.toFixed(1)}</Badge> : null}
+                  {movie.year ? <Badge variant="secondary">Year {movie.year}</Badge> : null}
+                  {movie.runtime ? <Badge variant="secondary">{movie.runtime} min</Badge> : null}
+                  <Badge variant="secondary">Avg rating {averageRating}</Badge>
+                  <Badge variant="secondary">Likes {likeCount}</Badge>
                 </div>
-                {fullReleaseDate ? <p className="mt-2 text-sm text-slate-400">Released {fullReleaseDate}</p> : null}
-                <button
+
+                <Button
                   type="button"
                   onClick={() => commentsSectionRef.current?.scrollIntoView({ behavior: "smooth" })}
-                  className="mt-4 inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-300 transition hover:border-amber-300/70 hover:bg-amber-400/20"
+                  variant="outline"
+                  className="mt-4 inline-flex items-center gap-2"
                 >
                   <MessageCircle size={16} />
-                  Show Reviews
-                </button>
+                  Show comments
+                </Button>
               </div>
 
-              <article className="rounded-3xl border border-slate-800 bg-slate-900/75 p-6">
-                <h2 className="inline-flex items-center gap-2 text-2xl font-semibold text-white">
-                  <Film size={20} className="text-amber-300" />
-                  Plot
-                </h2>
-                <p className="mt-3 text-base leading-relaxed text-slate-200 md:text-lg">{plot}</p>
-              </article>
+              <Card className="border-slate-800 bg-slate-900/75">
+                <CardContent className="p-6">
+                  <h2 className="text-xl font-semibold text-white">Plot</h2>
+                  <p className="mt-3 text-base leading-relaxed text-slate-200 md:text-lg">{plot}</p>
+                </CardContent>
+              </Card>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <article className="rounded-3xl border border-slate-800 bg-slate-900/75 p-5">
-                  <h3 className="text-2xl font-semibold text-white">Genres</h3>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {movie.genres?.length ? (
-                      movie.genres.map(genre => (
-                        <span
-                          key={genre}
-                          className="rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-sm font-semibold text-amber-300"
-                        >
-                          {genre}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-sm text-slate-400">No genres available.</span>
-                    )}
-                  </div>
-                </article>
-
-                <article className="rounded-3xl border border-slate-800 bg-slate-900/75 p-5">
-                  <h3 className="text-2xl font-semibold text-white">Directors</h3>
-                  <ul className="mt-3 space-y-2 text-base text-slate-200 md:text-lg">
-                    {movie.directors?.length ? (
-                      movie.directors.map(director => (
-                        <li key={director}>- {director}</li>
-                      ))
-                    ) : (
-                      <li className="text-sm text-slate-400">No director data.</li>
-                    )}
-                  </ul>
-                </article>
-              </div>
-
-              <article className="rounded-3xl border border-slate-800 bg-slate-900/75 p-5">
-                <h3 className="text-2xl font-semibold text-white">Cast</h3>
-                {movie.cast?.length ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {movie.cast.slice(0, 12).map(castName => (
-                      <span
-                        key={castName}
-                        className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-sm text-slate-200"
+              <Card className="border-slate-800 bg-slate-900/75">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold text-white">Your rating</h3>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((value) => (
+                      <Button
+                        key={value}
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={!isAuthenticated || ratePending}
+                        onClick={() => handleRate(value)}
                       >
-                        {castName}
-                      </span>
+                        <Star
+                          size={18}
+                          className={
+                            value <= myRating
+                              ? "fill-amber-400 text-amber-400"
+                              : "text-slate-400"
+                          }
+                        />
+                      </Button>
                     ))}
+                    <span className="text-sm text-slate-400">{totalRatings} total ratings</span>
                   </div>
-                ) : (
-                  <p className="mt-3 text-sm text-slate-400">No cast list available.</p>
-                )}
-              </article>
 
-              <article className="rounded-3xl border border-slate-800 bg-slate-900/75 p-5">
-                <h3 className="text-2xl font-semibold text-white">Posters</h3>
-                {hasPoster ? (
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <img
-                      src={posterUrl}
-                      alt={`${movie.title} poster`}
-                      className="w-full rounded-2xl border border-slate-700 object-cover"
-                    />
-                  </div>
-                ) : (
-                  <p className="mt-3 text-sm text-slate-400">No poster available.</p>
-                )}
-              </article>
+                  <Button
+                    type="button"
+                    variant={hasLiked ? "default" : "outline"}
+                    disabled={!isAuthenticated || likePending}
+                    onClick={() => toggleLike()}
+                    className="mt-4 inline-flex items-center gap-2"
+                  >
+                    <Heart size={16} className={hasLiked ? "fill-current" : ""} />
+                    {hasLiked ? "Unlike" : "Like"}
+                  </Button>
+
+                  {!isAuthenticated ? (
+                    <p className="mt-3 text-sm text-amber-300">
+                      Login required for like, rating and comments.
+                    </p>
+                  ) : null}
+
+                  {likeError ? (
+                    <p className="mt-2 text-sm text-rose-300">
+                      {likeError instanceof Error ? likeError.message : "Failed to like movie."}
+                    </p>
+                  ) : null}
+
+                  {rateError ? (
+                    <p className="mt-2 text-sm text-rose-300">
+                      {rateError instanceof Error ? rateError.message : "Failed to rate movie."}
+                    </p>
+                  ) : null}
+                </CardContent>
+              </Card>
             </div>
           </div>
 
-          <section ref={commentsSectionRef} className="rounded-3xl border border-slate-800 bg-slate-900/75 p-6">
+          <section
+            ref={commentsSectionRef}
+            className="rounded-3xl border border-slate-800 bg-slate-900/75 p-6"
+          >
             <h2 className="inline-flex items-center gap-2 text-2xl font-semibold text-white md:text-4xl">
               <MessageCircle size={24} className="text-amber-300" />
               Comments
             </h2>
 
-            <form onSubmit={handleSubmitComment} className="mt-5 space-y-3">
-              <div className="grid gap-3 md:grid-cols-[220px_1fr]">
-                <input
-                  type="text"
-                  value={author}
-                  onChange={event => setAuthor(event.target.value)}
-                  placeholder="Your name (optional)"
-                  className="w-full rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-amber-300/70 focus:outline-none focus:ring-2 focus:ring-amber-300/20"
-                />
-                <textarea
+            {isAuthenticated ? (
+              <form onSubmit={handleSubmitComment} className="mt-5 space-y-3">
+                <Textarea
                   value={message}
-                  onChange={event => setMessage(event.target.value)}
-                  onBlur={() => setIsMessageTouched(true)}
+                  onChange={(event) => setMessage(event.target.value)}
                   placeholder="Share your thoughts about this movie..."
-                  rows={2}
-                  className="w-full rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-amber-300/70 focus:outline-none focus:ring-2 focus:ring-amber-300/20"
+                  rows={3}
+                  className="bg-slate-950/70 text-slate-100"
                 />
-              </div>
+                <Button type="submit" disabled={commentPending}>
+                  {commentPending ? "Posting..." : "Post Comment"}
+                </Button>
+              </form>
+            ) : (
+              <p className="mt-4 text-sm text-slate-400">Login to post a comment.</p>
+            )}
 
-              {isMessageTouched && !message.trim() ? (
-                <p className="text-sm text-rose-200">Comment message is required.</p>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={isPending}
-                className="inline-flex items-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-amber-400/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                <Send size={16} />
-                {isPending ? "Posting..." : "Post Comment"}
-              </button>
-            </form>
-
-            {isCommentError ? <p className="mt-3 text-sm text-rose-200">{commentErrorMessage}</p> : null}
+            {isCommentError ? (
+              <p className="mt-3 text-sm text-rose-200">
+                {commentError instanceof Error ? commentError.message : "Failed to post your comment."}
+              </p>
+            ) : null}
 
             <div className="mt-6 space-y-3">
               {commentsLoading ? (
@@ -315,19 +314,25 @@ export const MovieDetails = ({ movieId, onBack }: MovieDetailsProps) => {
                   No comments yet. Be the first to comment.
                 </div>
               ) : (
-                comments.map(comment => (
+                comments.map((comment) => (
                   <article
                     key={comment._id}
                     className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-700/70 text-slate-200">
-                        <UserCircle2 size={17} />
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback>
+                          {comment.user.name.slice(0, 1).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <p className="text-base font-semibold text-white md:text-lg">
+                        {comment.user.name}
+                      </p>
+                      <span className="text-sm text-slate-500">
+                        {formatRelativeTime(comment.createdAt)}
                       </span>
-                      <p className="text-base font-semibold text-white md:text-lg">{comment.author}</p>
-                      <span className="text-sm text-slate-500">{formatRelativeTime(comment.createdAt)}</span>
                     </div>
-                    <p className="mt-3 text-base text-slate-200 md:text-lg">{comment.message}</p>
+                    <p className="mt-3 text-base text-slate-200 md:text-lg">{comment.text}</p>
                   </article>
                 ))
               )}
@@ -338,6 +343,3 @@ export const MovieDetails = ({ movieId, onBack }: MovieDetailsProps) => {
     </section>
   );
 };
-
-
-

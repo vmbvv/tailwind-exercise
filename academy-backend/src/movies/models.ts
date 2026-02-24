@@ -1,4 +1,4 @@
-import { Document, Schema, model } from "mongoose";
+import { Document, Schema, Types, model } from "mongoose";
 
 interface IRating {
   rating: number;
@@ -12,6 +12,12 @@ interface ITomatoes extends Document {
   critic?: IRating;
   rotten?: number;
   lastUpdated?: Date;
+}
+
+interface IMovieUserRating {
+  userId: Types.ObjectId;
+  value: number;
+  createdAt: Date;
 }
 
 export interface IMoviesDocument extends Document {
@@ -37,6 +43,8 @@ export interface IMoviesDocument extends Document {
     id?: number;
   };
   tomatoes?: ITomatoes;
+  ratings?: IMovieUserRating[];
+  likes?: Types.ObjectId[];
 }
 
 const TomatoesSchema: Schema<ITomatoes> = new Schema(
@@ -44,17 +52,26 @@ const TomatoesSchema: Schema<ITomatoes> = new Schema(
     viewer: {
       rating: { type: Number },
       numReviews: { type: Number },
-      meter: { type: Number }
+      meter: { type: Number },
     },
     critic: {
       rating: { type: Number },
       numReviews: { type: Number },
-      meter: { type: Number }
+      meter: { type: Number },
     },
     rotten: Number,
-    lastUpdated: Date
+    lastUpdated: Date,
   },
-  { _id: false }
+  { _id: false },
+);
+
+const MovieRatingSchema = new Schema<IMovieUserRating>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "users", required: true },
+    value: { type: Number, required: true, min: 1, max: 5 },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false },
 );
 
 const MovieSchema: Schema<IMoviesDocument> = new Schema({
@@ -72,14 +89,16 @@ const MovieSchema: Schema<IMoviesDocument> = new Schema({
   awards: {
     wins: Number,
     nominations: Number,
-    text: String
+    text: String,
   },
   imdb: {
     rating: Number,
     votes: Number,
-    id: Number
+    id: Number,
   },
-  tomatoes: TomatoesSchema
+  tomatoes: TomatoesSchema,
+  ratings: { type: [MovieRatingSchema], default: [] },
+  likes: { type: [Schema.Types.ObjectId], ref: "users", default: [] },
 });
 
 export const Movies = model<IMoviesDocument>("movies", MovieSchema);

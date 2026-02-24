@@ -5,12 +5,12 @@ import { MoviesSection } from "./MoviesSection";
 export const AllMovies = () => {
   const [page, setPage] = useState(1);
   const pageSize = 24;
-  const { movies, loading, isError, totalPages } = useGetMoviesTans(
-    undefined,
-    true,
+  const { movies, loading, isError, totalPages } = useGetMoviesTans({
     page,
-    pageSize,
-  );
+    limit: pageSize,
+    sortBy: "title",
+    order: "asc",
+  });
 
   return (
     <MoviesSection

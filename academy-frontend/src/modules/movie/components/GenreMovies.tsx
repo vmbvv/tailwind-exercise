@@ -21,11 +21,16 @@ export const GenreMovies = () => {
 
   const trimmedGenre = activeGenre.trim();
   const isEnabled = trimmedGenre.length > 0;
+
   const { movies, loading, isError, totalPages } = useGetMoviesTans(
-    trimmedGenre,
+    {
+      genre: trimmedGenre,
+      page,
+      limit: pageSize,
+      sortBy: "title",
+      order: "asc",
+    },
     isEnabled,
-    page,
-    pageSize,
   );
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -38,6 +43,7 @@ export const GenreMovies = () => {
     if (!trimmedGenre) {
       return "Pick a genre.";
     }
+
     return `Genre: ${trimmedGenre}`;
   }, [trimmedGenre]);
 

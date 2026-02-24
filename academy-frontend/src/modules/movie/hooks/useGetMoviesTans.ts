@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-
 import type { IMovie } from "../types/movie";
 
 interface MoviesResponse {
@@ -10,17 +9,39 @@ interface MoviesResponse {
   totalPages: number;
 }
 
-export const useGetMoviesTans = (
-  genre?: string,
-  enabled = true,
-  page = 1,
-  pageSize = 25
-) => {
+export type MovieSortBy = "title" | "year" | "rating";
+export type MovieOrder = "asc" | "desc";
+
+export interface MovieQueryParams {
+  genre?: string;
+  page: number;
+  limit: number;
+  sortBy: MovieSortBy;
+  order: MovieOrder;
+  search?: string;
+}
+
+export const useGetMoviesTans = (params: MovieQueryParams, enabled = true) => {
   const { data, isLoading, isError } = useQuery<MoviesResponse>({
-    queryKey: ["movies", genre, page, pageSize],
+    queryKey: ["movies", params],
     queryFn: async () => {
+      const qs = new URLSearchParams();
+
+      if (params.genre?.trim()) {
+        qs.set("genre", params.genre.trim());
+      }
+
+      if (params.search?.trim()) {
+        qs.set("search", params.search.trim());
+      }
+
+      qs.set("page", String(params.page));
+      qs.set("limit", String(params.limit));
+      qs.set("sortBy", params.sortBy);
+      qs.set("order", params.order);
+
       const response = await fetch(
-        `http://localhost:3000/movie/movies?genre=${genre || ""}&page=${page}&limit=${pageSize}`
+        `http://localhost:3000/movie/movies?${qs.toString()}`,
       );
 
       if (!response.ok) {
@@ -30,22 +51,15 @@ export const useGetMoviesTans = (
       return response.json();
     },
     staleTime: 1000 * 60 * 5,
-    enabled
+    enabled,
   });
-
-  //   const [movies, setMovies] = useState<IMovie[]>([]);
-  //   const [loading, setLoading] = useState<boolean>(true);
-
-  //   useEffect(() => {
-
-  //   }, [genre]);
 
   return {
     movies: data?.items ?? [],
     total: data?.total ?? 0,
-    page: data?.page ?? page,
+    page: data?.page ?? params.page,
     totalPages: data?.totalPages ?? 1,
     loading: isLoading,
-    isError
+    isError,
   };
 };
