@@ -3,8 +3,11 @@ node_modules/
 
 # build outputs
 dist/
+**/dist/
+**/dist-ssr/
 build/
 coverage/
+**/*.tsbuildinfo
 
 # logs
 npm-debug.log*
