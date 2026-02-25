@@ -31,9 +31,11 @@ const parseStringList = (value?: string[] | string) => {
   return undefined;
 };
 
-const asString = (value: unknown) => (typeof value === "string" ? value : undefined);
+const asString = (value: unknown) =>
+  typeof value === "string" ? value : undefined;
 
-const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegex = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const sortFieldMap = {
   title: "title",
@@ -41,24 +43,29 @@ const sortFieldMap = {
   rating: "imdb.rating",
 } as const;
 
-movieRouter.get("/movies/genres", async (_req: Request, res: Response) => {
-  try {
-    const genres = await Movies.distinct("genres");
-    const normalizedGenres = genres
-      .filter(
-        (genre): genre is string =>
-          typeof genre === "string" && Boolean(genre.trim()),
-      )
-      .sort((a, b) => a.localeCompare(b));
+movieRouter.get(
+  "/movies/genres",
+  requireAuth,
+  async (_req: Request, res: Response) => {
+    try {
+      const genres = await Movies.distinct("genres");
+      const normalizedGenres = genres
+        .filter(
+          (genre): genre is string =>
+            typeof genre === "string" && Boolean(genre.trim()),
+        )
+        .sort((a, b) => a.localeCompare(b));
 
-    return res.json({ items: normalizedGenres });
-  } catch (error) {
-    console.error("Genres fetch error:", error);
-    return res.status(500).json({ error: "Failed to fetch genres." });
-  }
-});
+      return res.json({ items: normalizedGenres });
+    } catch (error) {
+      console.error("Genres fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch genres." });
+    }
+  },
+);
 
-movieRouter.get("/movies", async (req: Request, res: Response) => {
+movieRouter.get("/movies", requireAuth, async (req: Request, res: Response) => {
+  //restrict movies endpoint to logged in users only
   try {
     const genre = asString(req.query.genre);
     const pageRaw = asString(req.query.page);
@@ -169,7 +176,8 @@ movieRouter.post("/addMovie", async (req: Request, res: Response) => {
     const parsedRuntime = runtime !== undefined ? Number(runtime) : Number.NaN;
     const parsedRating =
       imdbRating !== undefined ? Number(imdbRating) : Number.NaN;
-    const parsedVotes = imdbVotes !== undefined ? Number(imdbVotes) : Number.NaN;
+    const parsedVotes =
+      imdbVotes !== undefined ? Number(imdbVotes) : Number.NaN;
     const parsedImdbId = imdbId !== undefined ? Number(imdbId) : Number.NaN;
     const parsedAwardsWins =
       awardsWins !== undefined ? Number(awardsWins) : Number.NaN;
@@ -373,113 +381,121 @@ movieRouter.post(
   },
 );
 
-movieRouter.post("/:movieId/rate", requireAuth, async (req: AuthRequest, res: Response) => {
-  const movieObjectId = parseMovieObjectId(req.params.movieId);
+movieRouter.post(
+  "/:movieId/rate",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    const movieObjectId = parseMovieObjectId(req.params.movieId);
 
-  if (!movieObjectId) {
-    return res.status(400).json({ error: "Invalid movie id." });
-  }
-
-  const value = Number((req.body as { value?: number }).value);
-
-  if (!Number.isFinite(value) || value < 1 || value > 5) {
-    return res.status(400).json({ error: "Rating must be between 1 and 5." });
-  }
-
-  try {
-    const movie = await Movies.findById(movieObjectId);
-
-    if (!movie) {
-      return res.status(404).json({ error: "Movie not found." });
+    if (!movieObjectId) {
+      return res.status(400).json({ error: "Invalid movie id." });
     }
 
-    const userId = req.user!.id;
-    const ratings = (movie.ratings ?? []) as Array<{
-      userId: mongoose.Types.ObjectId;
-      value: number;
-      createdAt: Date;
-    }>;
+    const value = Number((req.body as { value?: number }).value);
 
-    const existing = ratings.find((item) => String(item.userId) === userId);
+    if (!Number.isFinite(value) || value < 1 || value > 5) {
+      return res.status(400).json({ error: "Rating must be between 1 and 5." });
+    }
 
-    if (existing) {
-      existing.value = value;
-      existing.createdAt = new Date();
-    } else {
-      ratings.push({
-        userId: new mongoose.Types.ObjectId(userId),
-        value,
-        createdAt: new Date(),
+    try {
+      const movie = await Movies.findById(movieObjectId);
+
+      if (!movie) {
+        return res.status(404).json({ error: "Movie not found." });
+      }
+
+      const userId = req.user!.id;
+      const ratings = (movie.ratings ?? []) as Array<{
+        userId: mongoose.Types.ObjectId;
+        value: number;
+        createdAt: Date;
+      }>;
+
+      const existing = ratings.find((item) => String(item.userId) === userId);
+
+      if (existing) {
+        existing.value = value;
+        existing.createdAt = new Date();
+      } else {
+        ratings.push({
+          userId: new mongoose.Types.ObjectId(userId),
+          value,
+          createdAt: new Date(),
+        });
+      }
+
+      movie.ratings = ratings as any;
+      await movie.save();
+
+      const totalRatings = movie.ratings?.length ?? 0;
+      const averageRating =
+        totalRatings > 0
+          ? Number(
+              (
+                (movie.ratings ?? []).reduce(
+                  (sum: number, item: any) => sum + Number(item.value),
+                  0,
+                ) / totalRatings
+              ).toFixed(1),
+            )
+          : 0;
+
+      return res.json({
+        averageRating,
+        totalRatings,
+        myRating: value,
       });
+    } catch (error) {
+      console.error("Rate movie error:", error);
+      return res.status(500).json({ error: "Failed to rate movie." });
+    }
+  },
+);
+
+movieRouter.post(
+  "/:movieId/like",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    const movieObjectId = parseMovieObjectId(req.params.movieId);
+
+    if (!movieObjectId) {
+      return res.status(400).json({ error: "Invalid movie id." });
     }
 
-    movie.ratings = ratings as any;
-    await movie.save();
+    try {
+      const movie = await Movies.findById(movieObjectId);
 
-    const totalRatings = movie.ratings?.length ?? 0;
-    const averageRating =
-      totalRatings > 0
-        ? Number(
-            (
-              (movie.ratings ?? []).reduce(
-                (sum: number, item: any) => sum + Number(item.value),
-                0,
-              ) / totalRatings
-            ).toFixed(1),
-          )
-        : 0;
+      if (!movie) {
+        return res.status(404).json({ error: "Movie not found." });
+      }
 
-    return res.json({
-      averageRating,
-      totalRatings,
-      myRating: value,
-    });
-  } catch (error) {
-    console.error("Rate movie error:", error);
-    return res.status(500).json({ error: "Failed to rate movie." });
-  }
-});
+      const userId = req.user!.id;
+      const likes = (movie.likes ?? []) as mongoose.Types.ObjectId[];
+      const likeIndex = likes.findIndex((id) => String(id) === userId);
 
-movieRouter.post("/:movieId/like", requireAuth, async (req: AuthRequest, res: Response) => {
-  const movieObjectId = parseMovieObjectId(req.params.movieId);
+      let liked = false;
 
-  if (!movieObjectId) {
-    return res.status(400).json({ error: "Invalid movie id." });
-  }
+      if (likeIndex >= 0) {
+        likes.splice(likeIndex, 1);
+        liked = false;
+      } else {
+        likes.push(new mongoose.Types.ObjectId(userId));
+        liked = true;
+      }
 
-  try {
-    const movie = await Movies.findById(movieObjectId);
+      movie.likes = likes as any;
+      await movie.save();
 
-    if (!movie) {
-      return res.status(404).json({ error: "Movie not found." });
+      return res.json({
+        liked,
+        likeCount: movie.likes?.length ?? 0,
+      });
+    } catch (error) {
+      console.error("Like movie error:", error);
+      return res.status(500).json({ error: "Failed to like movie." });
     }
-
-    const userId = req.user!.id;
-    const likes = (movie.likes ?? []) as mongoose.Types.ObjectId[];
-    const likeIndex = likes.findIndex((id) => String(id) === userId);
-
-    let liked = false;
-
-    if (likeIndex >= 0) {
-      likes.splice(likeIndex, 1);
-      liked = false;
-    } else {
-      likes.push(new mongoose.Types.ObjectId(userId));
-      liked = true;
-    }
-
-    movie.likes = likes as any;
-    await movie.save();
-
-    return res.json({
-      liked,
-      likeCount: movie.likes?.length ?? 0,
-    });
-  } catch (error) {
-    console.error("Like movie error:", error);
-    return res.status(500).json({ error: "Failed to like movie." });
-  }
-});
+  },
+);
 
 movieRouter.get("/:movieId", async (req: Request, res: Response) => {
   const movieObjectId = parseMovieObjectId(req.params.movieId);
