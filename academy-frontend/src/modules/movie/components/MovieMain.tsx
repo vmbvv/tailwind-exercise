@@ -46,7 +46,6 @@ export const MovieMain = () => {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-
   const { movies, loading, isError, totalPages, total } = useGetMoviesTans(
     {
       genre: selectedGenre || undefined,
@@ -90,10 +89,9 @@ export const MovieMain = () => {
       <div className="relative mx-auto max-w-[1300px] px-6 py-10">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-semibold text-white md:text-6xl">Movie Collection</h1>
-            <p className="mt-2 text-base text-slate-300 md:text-xl">
-              Discover and explore your favorite films
-            </p>
+            <h1 className="text-4xl font-semibold text-white md:text-6xl">
+              Erxes Movie
+            </h1>
           </div>
 
           <div className="flex items-center gap-3">
@@ -123,7 +121,9 @@ export const MovieMain = () => {
 
         {!isAuthenticated ? (
           <div className="mt-8 rounded-3xl border border-slate-800/90 bg-slate-900/70 p-8 text-center">
-            <h2 className="text-2xl font-semibold text-white">Sign in to browse movies</h2>
+            <h2 className="text-2xl font-semibold text-white">
+              Sign in to browse movies
+            </h2>
             <p className="mt-2 text-slate-300">
               You need an account to view the movie list and use search filters.
             </p>
@@ -190,7 +190,9 @@ export const MovieMain = () => {
                 </Button>
 
                 {genresLoading ? (
-                  <span className="px-3 py-2 text-sm text-slate-400">Loading genres...</span>
+                  <span className="px-3 py-2 text-sm text-slate-400">
+                    Loading genres...
+                  </span>
                 ) : (
                   visibleGenres.map((genre) => (
                     <Button

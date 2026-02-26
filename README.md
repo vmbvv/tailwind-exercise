@@ -20,13 +20,6 @@ npm install
 
 Create `academy-backend/.env`:
 
-```env
-PORT=3000
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-CORS_ORIGIN=http://localhost:5173
-```
-
 ## 3) Start backend
 
 ```bash
@@ -46,6 +39,3 @@ npm run dev
 ## 5) Open app
 
 `http://localhost:5173`
-
----
-If PowerShell blocks `npm`, use `npm.cmd` instead.
