@@ -1,8 +1,6 @@
 import {
   createContext,
   useContext,
-  useEffect,
-  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -33,13 +31,33 @@ const STORAGE_KEY = "movie_auth";
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const getStoredAuth = (): AuthPayload | null => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as AuthPayload;
+
+    if (parsed?.token && parsed?.user) {
+      return parsed;
+    }
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  return null;
+};
+
 const parseErrorMessage = async (response: Response) => {
   try {
     const body = await response.json();
     if (typeof body?.error === "string") {
       return body.error;
     }
-  } catch (_error) {
+  } catch {
     // ignore json parse errors
   }
 
@@ -47,27 +65,8 @@ const parseErrorMessage = async (response: Response) => {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<AuthUser | null>(null);
-
-  useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-
-    if (!raw) {
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as AuthPayload;
-
-      if (parsed?.token && parsed?.user) {
-        setToken(parsed.token);
-        setUser(parsed.user);
-      }
-    } catch (_error) {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, []);
+  const [token, setToken] = useState<string | null>(() => getStoredAuth()?.token ?? null);
+  const [user, setUser] = useState<AuthUser | null>(() => getStoredAuth()?.user ?? null);
 
   const persist = (payload: AuthPayload) => {
     setToken(payload.token);
@@ -125,18 +124,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return headers;
   };
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      token,
-      isAuthenticated: Boolean(user && token),
-      login,
-      signup,
-      logout,
-      getAuthHeaders,
-    }),
-    [user, token],
-  );
+  const value: AuthContextValue = {
+    user,
+    token,
+    isAuthenticated: Boolean(user && token),
+    login,
+    signup,
+    logout,
+    getAuthHeaders,
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

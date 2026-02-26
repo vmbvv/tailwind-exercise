@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/AuthContext";
 
 export interface AddMoviePayload {
   title: string;
@@ -22,19 +23,26 @@ export interface AddMoviePayload {
 
 export const useAddMovie = () => {
   const queryClient = useQueryClient();
+  const { token, getAuthHeaders } = useAuth();
 
   const mutation = useMutation({
     mutationFn: async (payload: AddMoviePayload) => {
+      if (!token) {
+        throw new Error("Login required");
+      }
+
       const response = await fetch(`http://localhost:3000/movie/addMovie`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to add movie");
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "Failed to add movie");
       }
 
       return response.json();

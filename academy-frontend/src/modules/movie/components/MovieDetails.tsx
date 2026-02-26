@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { ArrowLeft, Film, Heart, MessageCircle, Star } from "lucide-react";
 import { useAuth } from "@/AuthContext";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -86,39 +86,26 @@ export const MovieDetails = ({ movieId, onBack }: MovieDetailsProps) => {
 
   const likeCount = movie?.likeCount ?? movie?.likes?.length ?? 0;
 
-  const hasLiked = useMemo(() => {
-    if (!user || !movie?.likes?.length) {
-      return false;
-    }
+  const hasLiked = Boolean(
+    user && movie?.likes?.some((id) => String(id) === user.id),
+  );
 
-    return movie.likes.some((id) => String(id) === user.id);
-  }, [movie?.likes, user]);
+  const myRating =
+    user && movie?.ratings?.length
+      ? (movie.ratings.find((item) => String(item.userId) === user.id)?.value ?? 0)
+      : 0;
 
-  const myRating = useMemo(() => {
-    if (!user || !movie?.ratings?.length) {
-      return 0;
-    }
-
-    const existing = movie.ratings.find((item) => String(item.userId) === user.id);
-    return existing?.value ?? 0;
-  }, [movie?.ratings, user]);
-
-  const averageRating = useMemo(() => {
-    if (typeof movie?.averageUserRating === "number") {
-      return movie.averageUserRating;
-    }
-
-    if (!movie?.ratings?.length) {
-      return 0;
-    }
-
-    return Number(
-      (
-        movie.ratings.reduce((sum, item) => sum + Number(item.value), 0) /
-        movie.ratings.length
-      ).toFixed(1),
-    );
-  }, [movie]);
+  const averageRating =
+    typeof movie?.averageUserRating === "number"
+      ? movie.averageUserRating
+      : movie?.ratings?.length
+        ? Number(
+            (
+              movie.ratings.reduce((sum, item) => sum + Number(item.value), 0) /
+              movie.ratings.length
+            ).toFixed(1),
+          )
+        : 0;
 
   const totalRatings = movie?.totalUserRatings ?? movie?.ratings?.length ?? 0;
 

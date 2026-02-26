@@ -46,6 +46,7 @@ export const MovieMain = () => {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+
   const { movies, loading, isError, totalPages, total } = useGetMoviesTans(
     {
       genre: selectedGenre || undefined,
@@ -55,16 +56,27 @@ export const MovieMain = () => {
       order,
       search,
     },
-    true,
+    isAuthenticated,
   );
 
-  const { genres, loading: genresLoading } = useGetGenres();
+  const { genres, loading: genresLoading } = useGetGenres(isAuthenticated);
 
   const visibleGenres = useMemo(() => genres, [genres]);
 
   const handleSelectGenre = (genre: string) => {
     setSelectedGenre(genre);
     setPage(1);
+  };
+
+  const openAuthDialog = () => setIsAuthOpen(true);
+
+  const handleAddMovieClick = () => {
+    if (!isAuthenticated) {
+      openAuthDialog();
+      return;
+    }
+
+    setIsAddMovieOpen(true);
   };
 
   return (
@@ -93,14 +105,14 @@ export const MovieMain = () => {
                 </Button>
               </>
             ) : (
-              <Button variant="outline" onClick={() => setIsAuthOpen(true)}>
+              <Button variant="outline" onClick={openAuthDialog}>
                 Login / Sign up
               </Button>
             )}
 
             <Button
               type="button"
-              onClick={() => setIsAddMovieOpen(true)}
+              onClick={handleAddMovieClick}
               className="inline-flex items-center gap-2"
             >
               <Plus size={18} />
@@ -109,95 +121,109 @@ export const MovieMain = () => {
           </div>
         </header>
 
-        <div className="mt-6 grid gap-3 md:grid-cols-3">
-          <Input
-            value={searchInput}
-            onChange={(event) => {
-              setSearchInput(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Search title, director, cast, description..."
-          />
-
-          <Select
-            value={sortBy}
-            onValueChange={(value: MovieSortBy) => {
-              setSortBy(value);
-              setPage(1);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="title">Title</SelectItem>
-              <SelectItem value="year">Year</SelectItem>
-              <SelectItem value="rating">IMDb Rating</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={order}
-            onValueChange={(value: MovieOrder) => {
-              setOrder(value);
-              setPage(1);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Order" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="asc">Ascending</SelectItem>
-              <SelectItem value="desc">Descending</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="mt-8 rounded-3xl border border-slate-800/90 bg-slate-900/70 p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              onClick={() => handleSelectGenre("")}
-              variant={selectedGenre === "" ? "default" : "outline"}
-              className="inline-flex items-center gap-2"
-            >
-              <Clapperboard size={16} />
-              All Movies
+        {!isAuthenticated ? (
+          <div className="mt-8 rounded-3xl border border-slate-800/90 bg-slate-900/70 p-8 text-center">
+            <h2 className="text-2xl font-semibold text-white">Sign in to browse movies</h2>
+            <p className="mt-2 text-slate-300">
+              You need an account to view the movie list and use search filters.
+            </p>
+            <Button className="mt-6" onClick={openAuthDialog}>
+              Login / Sign up
             </Button>
-
-            {genresLoading ? (
-              <span className="px-3 py-2 text-sm text-slate-400">Loading genres...</span>
-            ) : (
-              visibleGenres.map((genre) => (
-                <Button
-                  key={genre}
-                  type="button"
-                  variant={selectedGenre === genre ? "default" : "outline"}
-                  onClick={() => handleSelectGenre(genre)}
-                >
-                  {genre}
-                </Button>
-              ))
-            )}
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <Input
+                value={searchInput}
+                onChange={(event) => {
+                  setSearchInput(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search title, director, cast, description..."
+              />
 
-        <MovieBrowserSection
-          movies={movies}
-          loading={loading}
-          isError={isError}
-          total={total}
-          page={page}
-          totalPages={totalPages}
-          onPrev={() => setPage((current) => Math.max(current - 1, 1))}
-          onNext={() => {
-            if (page < totalPages) {
-              setPage((current) => current + 1);
-            }
-          }}
-          onPageSelect={setPage}
-          onOpenMovie={(movieId) => navigate(`/movie/${movieId}`)}
-        />
+              <Select
+                value={sortBy}
+                onValueChange={(value: MovieSortBy) => {
+                  setSortBy(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="title">Title</SelectItem>
+                  <SelectItem value="year">Year</SelectItem>
+                  <SelectItem value="rating">IMDb Rating</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={order}
+                onValueChange={(value: MovieOrder) => {
+                  setOrder(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Ascending</SelectItem>
+                  <SelectItem value="desc">Descending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="mt-8 rounded-3xl border border-slate-800/90 bg-slate-900/70 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={() => handleSelectGenre("")}
+                  variant={selectedGenre === "" ? "default" : "outline"}
+                  className="inline-flex items-center gap-2"
+                >
+                  <Clapperboard size={16} />
+                  All Movies
+                </Button>
+
+                {genresLoading ? (
+                  <span className="px-3 py-2 text-sm text-slate-400">Loading genres...</span>
+                ) : (
+                  visibleGenres.map((genre) => (
+                    <Button
+                      key={genre}
+                      type="button"
+                      variant={selectedGenre === genre ? "default" : "outline"}
+                      onClick={() => handleSelectGenre(genre)}
+                    >
+                      {genre}
+                    </Button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <MovieBrowserSection
+              movies={movies}
+              loading={loading}
+              isError={isError}
+              total={total}
+              page={page}
+              totalPages={totalPages}
+              onPrev={() => setPage((current) => Math.max(current - 1, 1))}
+              onNext={() => {
+                if (page < totalPages) {
+                  setPage((current) => current + 1);
+                }
+              }}
+              onPageSelect={setPage}
+              onOpenMovie={(movieId) => navigate(`/movie/${movieId}`)}
+            />
+          </>
+        )}
       </div>
 
       {isAddMovieOpen ? (

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/AuthContext";
 import type { IMovie } from "../types/movie";
 
 interface MoviesResponse {
@@ -22,6 +23,8 @@ export interface MovieQueryParams {
 }
 
 export const useGetMoviesTans = (params: MovieQueryParams, enabled = true) => {
+  const { getAuthHeaders, isAuthenticated } = useAuth();
+
   const { data, isLoading, isError } = useQuery<MoviesResponse>({
     queryKey: ["movies", params],
     queryFn: async () => {
@@ -41,7 +44,10 @@ export const useGetMoviesTans = (params: MovieQueryParams, enabled = true) => {
       qs.set("order", params.order);
 
       const response = await fetch(
-        `http://localhost:3000/movie/movies?${qs.toString()}`,
+        `http://localhost:3000/movies?${qs.toString()}`,
+        {
+          headers: getAuthHeaders(),
+        },
       );
 
       if (!response.ok) {
@@ -51,7 +57,7 @@ export const useGetMoviesTans = (params: MovieQueryParams, enabled = true) => {
       return response.json();
     },
     staleTime: 1000 * 60 * 5,
-    enabled,
+    enabled: enabled && isAuthenticated,
   });
 
   return {

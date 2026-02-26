@@ -43,29 +43,29 @@ const sortFieldMap = {
   rating: "imdb.rating",
 } as const;
 
-movieRouter.get(
-  "/movies/genres",
-  requireAuth,
-  async (_req: Request, res: Response) => {
-    try {
-      const genres = await Movies.distinct("genres");
-      const normalizedGenres = genres
-        .filter(
-          (genre): genre is string =>
-            typeof genre === "string" && Boolean(genre.trim()),
-        )
-        .sort((a, b) => a.localeCompare(b));
+export const getMovieGenresHandler = async (
+  _req: Request,
+  res: Response,
+) => {
+  try {
+    const genres = await Movies.distinct("genres");
+    const normalizedGenres = genres
+      .filter(
+        (genre): genre is string =>
+          typeof genre === "string" && Boolean(genre.trim()),
+      )
+      .sort((a, b) => a.localeCompare(b));
 
-      return res.json({ items: normalizedGenres });
-    } catch (error) {
-      console.error("Genres fetch error:", error);
-      return res.status(500).json({ error: "Failed to fetch genres." });
-    }
-  },
-);
+    return res.json({ items: normalizedGenres });
+  } catch (error) {
+    console.error("Genres fetch error:", error);
+    return res.status(500).json({ error: "Failed to fetch genres." });
+  }
+};
 
-movieRouter.get("/movies", requireAuth, async (req: Request, res: Response) => {
-  //restrict movies endpoint to logged in users only
+movieRouter.get("/movies/genres", requireAuth, getMovieGenresHandler);
+
+export const getMoviesHandler = async (req: Request, res: Response) => {
   try {
     const genre = asString(req.query.genre);
     const pageRaw = asString(req.query.page);
@@ -90,15 +90,19 @@ movieRouter.get("/movies", requireAuth, async (req: Request, res: Response) => {
     }
 
     if (searchRaw?.trim()) {
-      const regex = new RegExp(escapeRegex(searchRaw.trim().slice(0, 80)), "i");
+      const normalizedPattern = escapeRegex(searchRaw.trim().slice(0, 80));
+      const regexFilter = {
+        $regex: normalizedPattern,
+        $options: "i",
+      };
 
       query.$or = [
-        { title: regex },
-        { directors: regex },
-        { cast: regex },
-        { plot: regex },
-        { fullplot: regex },
-        { description: regex },
+        { title: regexFilter },
+        { directors: regexFilter },
+        { cast: regexFilter },
+        { plot: regexFilter },
+        { fullplot: regexFilter },
+        { description: regexFilter },
       ];
     }
 
@@ -121,9 +125,11 @@ movieRouter.get("/movies", requireAuth, async (req: Request, res: Response) => {
     console.error("Movies fetch error:", error);
     return res.status(500).json({ error: "Failed to fetch movies." });
   }
-});
+};
 
-movieRouter.post("/addMovie", async (req: Request, res: Response) => {
+movieRouter.get("/movies", requireAuth, getMoviesHandler);
+
+movieRouter.post("/addMovie", requireAuth, async (req: Request, res: Response) => {
   try {
     const {
       title,

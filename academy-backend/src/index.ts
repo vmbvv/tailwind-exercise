@@ -2,8 +2,13 @@ import dotenv from "dotenv";
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-import { movieRouter } from "./movies/routes.ts";
+import {
+  getMovieGenresHandler,
+  getMoviesHandler,
+  movieRouter,
+} from "./movies/routes.ts";
 import { authRouter } from "./auth/routes.ts";
+import { requireAuth } from "./auth/requireAuth.ts";
 
 dotenv.config();
 
@@ -24,6 +29,8 @@ app.use(express.json());
 
 app.use("/auth", authRouter);
 app.use("/movie", movieRouter);
+app.get("/movies", requireAuth, getMoviesHandler);
+app.get("/movies/genres", requireAuth, getMovieGenresHandler);
 
 mongoose
   .connect(mongoURI)

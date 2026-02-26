@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
-import { Calendar, Clock3, Play, Star } from "lucide-react";
+import { Calendar, Clock3, Heart, Play, Star } from "lucide-react";
+import { useAuth } from "@/AuthContext";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Pagination,
@@ -12,6 +14,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLikeMovie, useRateMovie } from "../hooks/useMovieInteractions";
 import type { IMovie } from "../types/movie";
 
 interface MovieBrowserSectionProps {
@@ -34,25 +37,42 @@ const MovieCard = ({
   movie: IMovie;
   onOpenMovie: (movieId: string) => void;
 }) => {
+  const { user } = useAuth();
+  const { toggleLike, isPending: likePending } = useLikeMovie(movie._id);
+  const { rateMovie, isPending: ratePending } = useRateMovie(movie._id);
   const [hasImageError, setHasImageError] = useState(false);
 
   const hasPoster = Boolean(movie.poster?.startsWith("http")) && !hasImageError;
   const summary = movie.plot ?? movie.fullplot ?? "No plot available for this movie.";
   const shortenedSummary =
     summary.length > 90 ? `${summary.slice(0, 90).trim()}...` : summary;
+  const ratings = movie.ratings ?? [];
+  const likeCount = movie.likeCount ?? movie.likes?.length ?? 0;
+  const hasLiked = Boolean(user && movie.likes?.some((id) => String(id) === user.id));
+  const myRating = user
+    ? (ratings.find((item) => String(item.userId) === user.id)?.value ?? 0)
+    : 0;
+  const averageRating =
+    typeof movie.averageUserRating === "number"
+      ? movie.averageUserRating
+      : ratings.length
+        ? Number(
+            (ratings.reduce((sum, item) => sum + Number(item.value), 0) / ratings.length).toFixed(1),
+          )
+        : 0;
 
   return (
-    <button
-      type="button"
-      disabled={!movie._id}
-      onClick={() => {
-        if (movie._id) {
-          onOpenMovie(movie._id);
-        }
-      }}
-      className="h-full w-full text-left disabled:cursor-not-allowed"
-    >
-      <Card className="group flex h-full flex-col overflow-hidden border-slate-800 bg-slate-900/70 transition hover:-translate-y-1 hover:border-amber-300/60">
+    <Card className="group flex h-full flex-col overflow-hidden border-slate-800 bg-slate-900/70 transition hover:-translate-y-1 hover:border-amber-300/60">
+      <button
+        type="button"
+        disabled={!movie._id}
+        onClick={() => {
+          if (movie._id) {
+            onOpenMovie(movie._id);
+          }
+        }}
+        className="flex flex-1 flex-col text-left disabled:cursor-not-allowed"
+      >
         <div className="relative aspect-[2/3] overflow-hidden bg-slate-950">
           {hasPoster ? (
             <img
@@ -96,31 +116,73 @@ const MovieCard = ({
         <CardContent>
           <p className="text-sm text-slate-300">{shortenedSummary}</p>
         </CardContent>
+      </button>
 
-        <CardFooter className="mt-auto flex flex-wrap items-center gap-2 pt-2 text-xs text-slate-300">
-          {movie.imdb?.rating ? (
-            <Badge variant="secondary" className="gap-1 text-amber-200">
-              <Star size={13} className="fill-current" />
-              {movie.imdb.rating.toFixed(1)}
-            </Badge>
-          ) : null}
+      <CardFooter className="mt-auto flex flex-wrap items-center gap-2 pt-2 text-xs text-slate-300">
+        {movie.imdb?.rating ? (
+          <Badge variant="secondary" className="gap-1 text-amber-200">
+            <Star size={13} className="fill-current" />
+            {movie.imdb.rating.toFixed(1)}
+          </Badge>
+        ) : null}
 
-          {movie.runtime ? (
-            <span className="inline-flex items-center gap-1">
-              <Clock3 size={13} />
-              {movie.runtime} min
-            </span>
-          ) : null}
+        {movie.runtime ? (
+          <span className="inline-flex items-center gap-1">
+            <Clock3 size={13} />
+            {movie.runtime} min
+          </span>
+        ) : null}
 
-          {movie.year ? (
-            <span className="inline-flex items-center gap-1">
-              <Calendar size={13} />
-              {movie.year}
-            </span>
-          ) : null}
-        </CardFooter>
-      </Card>
-    </button>
+        {movie.year ? (
+          <span className="inline-flex items-center gap-1">
+            <Calendar size={13} />
+            {movie.year}
+          </span>
+        ) : null}
+
+        <Badge variant="secondary">Avg {averageRating.toFixed(1)}</Badge>
+        <Badge variant="secondary">Likes {likeCount}</Badge>
+      </CardFooter>
+
+      <div className="flex items-center justify-between gap-3 px-6 pb-6">
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((value) => (
+            <Button
+              key={value}
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={!movie._id || ratePending}
+              onClick={(event) => {
+                event.stopPropagation();
+                rateMovie({ value });
+              }}
+              className="h-7 w-7"
+            >
+              <Star
+                size={15}
+                className={value <= myRating ? "fill-amber-400 text-amber-400" : "text-slate-500"}
+              />
+            </Button>
+          ))}
+        </div>
+
+        <Button
+          type="button"
+          size="sm"
+          variant={hasLiked ? "default" : "outline"}
+          disabled={!movie._id || likePending}
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleLike();
+          }}
+          className="inline-flex items-center gap-1"
+        >
+          <Heart size={14} className={hasLiked ? "fill-current" : ""} />
+          {hasLiked ? "Unlike" : "Like"}
+        </Button>
+      </div>
+    </Card>
   );
 };
 
